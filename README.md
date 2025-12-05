@@ -14,6 +14,12 @@ cd lambda-cli
 pip install -e .
 ```
 
+or use pipx:
+```bash
+pipx install lambda-labs-cli
+```
+
+
 3. (Optional) If the `lambda` command is not in your PATH, add this to your shell configuration:
 ```bash
 # Add to ~/.bashrc or ~/.zshrc
@@ -21,6 +27,8 @@ export PATH="$HOME/Library/Python/3.11/bin:$PATH"
 ```
 
 Or use the full path: `/Users/<username>/Library/Python/3.11/bin/lambda`
+
+note: if you used `pipx` or something similar, then you should be fine to move on with quick start.
 
 ## Quick Start
 

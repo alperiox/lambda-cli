@@ -1,5 +1,5 @@
 [project]
-name = "lambda-cli"
+name = "lambda-labs-cli"
 version = "0.1.0"
 description = "CLI tool for Lambda Labs Cloud"
 readme = "README.md"

@@ -92,7 +92,7 @@ wheels = [
 ]
 
 [[package]]
-name = "lambda-cli"
+name = "lambda-labs-cli"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
