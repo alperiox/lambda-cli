@@ -14,7 +14,12 @@ cd lambda-cli
 pip install -e .
 ```
 
-or use pipx:
+or use `uv tool`:
+```bash
+uv tool install lambda-labs-cli
+```
+
+or `pipx`:
 ```bash
 pipx install lambda-labs-cli
 ```
