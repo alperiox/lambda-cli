@@ -20,7 +20,7 @@ pip install -e .
 export PATH="$HOME/Library/Python/3.11/bin:$PATH"
 ```
 
-Or use the full path: `/Users/alperiox/Library/Python/3.11/bin/lambda`
+Or use the full path: `/Users/<username>/Library/Python/3.11/bin/lambda`
 
 ## Quick Start
 
