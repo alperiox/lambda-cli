@@ -153,3 +153,24 @@ class LambdaLabsAPI:
         """
         payload = {"instance_ids": instance_ids}
         return self._request("POST", "/instance-operations/restart", json=payload)
+
+    def list_ssh_keys(self) -> Dict[str, Any]:
+        """List all registered SSH keys.
+
+        Returns:
+            Dictionary containing SSH key data
+        """
+        return self._request("GET", "/ssh-keys")
+
+    def add_ssh_key(self, name: str, public_key: str) -> Dict[str, Any]:
+        """Register a new SSH public key.
+
+        Args:
+            name: Name for the SSH key
+            public_key: The public key string
+
+        Returns:
+            Dictionary containing the created SSH key data
+        """
+        payload = {"name": name, "public_key": public_key}
+        return self._request("POST", "/ssh-keys", json=payload)

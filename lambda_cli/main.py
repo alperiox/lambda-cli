@@ -1,5 +1,5 @@
 """Lambda Labs Cloud CLI main entry point."""
-import sys
+import time
 from typing import Optional, List
 
 import typer
@@ -7,9 +7,11 @@ from rich.console import Console
 from rich.table import Table
 from rich import print as rprint
 from rich.panel import Panel
+from rich.live import Live
 
 from lambda_cli import config
 from lambda_cli.api import LambdaLabsAPI, LambdaLabsAPIError
+from lambda_cli.scheduler import InstanceWatcher
 
 app = typer.Typer(
     name="ll",
@@ -315,6 +317,94 @@ def instances_restart(
     except LambdaLabsAPIError as e:
         console.print(f"[red]Error:[/red] {str(e)}")
         raise typer.Exit(1)
+
+
+@instances_app.command("watch")
+def instances_watch(
+    instance_type: str = typer.Option(..., "--type", "-t", help="Instance type (e.g., gpu_1x_a10)"),
+    region: str = typer.Option(..., "--region", "-r", help="Region (e.g., us-west-1)"),
+    ssh_keys: List[str] = typer.Option(..., "--ssh-key", "-k", help="SSH key name(s)"),
+    file_systems: Optional[List[str]] = typer.Option(None, "--file-system", "-f", help="File system name(s)"),
+    quantity: int = typer.Option(1, "--quantity", "-q", help="Number of instances to launch"),
+    name: Optional[str] = typer.Option(None, "--name", "-n", help="Name for the instance"),
+    interval: int = typer.Option(120, "--interval", "-i", help="Poll interval in seconds"),
+    timeout: int = typer.Option(1440, "--timeout", help="Max wait time in minutes"),
+):
+    """Watch for instance availability and auto-launch when ready."""
+    api = get_api_client()
+    watcher = InstanceWatcher(
+        api=api,
+        instance_type=instance_type,
+        region=region,
+        ssh_key_names=ssh_keys,
+        file_system_names=file_systems,
+        quantity=quantity,
+        instance_name=name,
+    )
+
+    timeout_seconds = timeout * 60
+    start_time = time.time()
+
+    console.print(Panel.fit(
+        f"[bold cyan]Instance Watcher[/bold cyan]\n\n"
+        f"[bold]Type:[/bold] {instance_type}\n"
+        f"[bold]Region:[/bold] {region}\n"
+        f"[bold]SSH Keys:[/bold] {', '.join(ssh_keys)}\n"
+        f"[bold]Interval:[/bold] {interval}s\n"
+        f"[bold]Timeout:[/bold] {timeout}m"
+    ))
+
+    def build_status_table(status: str, next_poll_in: int = 0) -> Table:
+        elapsed = int(time.time() - start_time)
+        elapsed_m, elapsed_s = divmod(elapsed, 60)
+        elapsed_h, elapsed_m = divmod(elapsed_m, 60)
+
+        table = Table(show_header=False, box=None, padding=(0, 2))
+        table.add_column("Label", style="bold")
+        table.add_column("Value")
+        table.add_row("Status", status)
+        table.add_row("Elapsed", f"{elapsed_h:02d}:{elapsed_m:02d}:{elapsed_s:02d}")
+        table.add_row("Polls", str(watcher.poll_count))
+        if next_poll_in > 0:
+            table.add_row("Next poll in", f"{next_poll_in}s")
+        return table
+
+    try:
+        with Live(build_status_table("[yellow]Starting...[/yellow]"), console=console, refresh_per_second=1) as live:
+            while True:
+                elapsed = time.time() - start_time
+                if elapsed >= timeout_seconds:
+                    live.update(build_status_table("[red]Timeout reached[/red]"))
+                    console.print(f"\n[red]Timed out after {timeout} minutes[/red]")
+                    raise typer.Exit(1)
+
+                live.update(build_status_table("[cyan]Polling...[/cyan]"))
+                result = watcher.poll_once()
+
+                if result.error:
+                    live.update(build_status_table(f"[red]Error: {result.error}[/red]"))
+                elif result.launched:
+                    live.update(build_status_table("[green]Launched![/green]"))
+                    console.print(f"\n[green]Successfully launched instance(s)![/green]")
+                    if result.instance_ids:
+                        for iid in result.instance_ids:
+                            console.print(f"  - {iid}")
+                    return
+                else:
+                    live.update(build_status_table("[yellow]Not available[/yellow]"))
+
+                # Countdown between polls
+                for remaining in range(interval, 0, -1):
+                    elapsed = time.time() - start_time
+                    if elapsed >= timeout_seconds:
+                        break
+                    status = f"[red]Error: {result.error}[/red]" if result.error else "[yellow]Waiting...[/yellow]"
+                    live.update(build_status_table(status, next_poll_in=remaining))
+                    time.sleep(1)
+
+    except KeyboardInterrupt:
+        console.print(f"\n[yellow]Cancelled after {watcher.poll_count} poll(s)[/yellow]")
+        raise typer.Exit(0)
 
 
 if __name__ == "__main__":
